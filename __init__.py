@@ -1,5 +1,5 @@
 from binaryninja import *
-from binaryninja.types import Type
+from binaryninja.types import Type, Symbol
 from .svdmmap import parse
 
 def load_svd(bv):
@@ -16,6 +16,7 @@ def load_svd(bv):
         struct_type = Type.structure_type(s)
         bv.define_user_type(p['name'], struct_type)
         bv.define_data_var(p['base'], struct_type)
+        bv.define_auto_symbol(Symbol(SymbolType.ImportedDataSymbol, p['base'], p['name']))
 
 
 PluginCommand.register(
