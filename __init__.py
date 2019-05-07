@@ -10,11 +10,17 @@ def load_svd(bv):
                             SectionSemantics.ReadWriteDataSectionSemantics)
         bv.add_auto_segment(p['base'], p['size'], 0, 0,
                             SegmentFlag.SegmentContainsData | SegmentFlag.SegmentReadable | SegmentFlag.SegmentWritable)
-        s = Structure()
-        for r in p['registers'].values():
-            s.insert(r['offset'], Type.int(int(r['size']/8), False), r['name'])
-        struct_type = Type.structure_type(s)
-        bv.define_user_type(p['name'], struct_type)
+
+        struct_type = None
+        if 'derives' in p:
+            print("Hey, we hit it")
+            struct_type = bv.get_type_by_name(device['peripherals'][p['derives']]['name'])
+        else:
+            s = Structure()
+            for r in p['registers'].values():
+                s.insert(r['offset'], Type.int(int(r['size']/8), False), r['name'])
+            struct_type = Type.structure_type(s)
+            bv.define_user_type(p['name'], struct_type)
         bv.define_data_var(p['base'], struct_type)
         bv.define_auto_symbol(Symbol(SymbolType.ImportedDataSymbol, p['base'], p['name']))
 
