@@ -103,14 +103,14 @@ def expand_dim(node):
             li, ri = idxs.split("-")
             idxs = list(range(int(li), int(ri)+1))
         else:
-            raise ValueError(f"Unknown dimIndex: '{idxs}'")
+            raise ValueError("Unknown dimIndex: '{idxs}'".format(**locals()))
     nodes = []
     for cnt, idx in enumerate(idxs):
         name = get_string(node, 'name').replace("%s", str(idx))
         dim_node = copy.deepcopy(node)
         dim_node.find('name').text = name
         addr = get_int(dim_node, 'addressOffset') + cnt * inc
-        dim_node.find('addressOffset').text = f"0x{addr:08x}"
+        dim_node.find('addressOffset').text = "0x{addr:08x}".format(**locals())
         dim_node.attrib['dim_index'] = idx
         nodes.append(dim_node)
     return nodes
@@ -132,7 +132,7 @@ def expand_cluster(node):
         addr = cluster_addr + get_int(rtag, 'addressOffset')
         name = get_string(rtag, 'name') + str(cluster_idx)
         new_rtag = copy.deepcopy(rtag)
-        new_rtag.find('addressOffset').text = f"0x{addr:08x}"
+        new_rtag.find('addressOffset').text = "0x{addr:08x}".format(**locals())
         new_rtag.find('name').text = name
         nodes.append(new_rtag)
     return nodes
@@ -221,23 +221,23 @@ def to_text(device):
     """
     mmap = []
     for i in device['interrupts'].values():
-        mmap.append(f"INTERRUPT {i['value']:03d}: "
-                    + f"{i['name']} ({i['pname']}): {i['description']}")
+        mmap.append("INTERRUPT {i['value']:03d}: ".format(**locals())
+                    + "{i['name']} ({i['pname']}): {i['description']}".format(**locals()))
     for p in device['peripherals'].values():
-        mmap.append(f"0x{p['base']:08X} A PERIPHERAL {p['name']}")
+        mmap.append("0x{p['base']:08X} A PERIPHERAL {p['name']}".format(**locals()))
         for c in p['clusters'].values():
             addr = p['base'] + c['offset']
-            mmap.append(f"0x{addr:08X} B  CLUSTER {c['name']}: "
-                        + f"{c['description']}")
+            mmap.append("0x{addr:08X} B  CLUSTER {c['name']}: ".format(**locals())
+                        + "{c['description']}".format(**locals()))
         for r in p['registers'].values():
             addr = p['base'] + r['offset']
-            mmap.append(f"0x{addr:08X} B  REGISTER {r['name']}{r['access']}: "
-                        + f"{r['description']}")
+            mmap.append("0x{addr:08X} B  REGISTER {r['name']}{r['access']}: ".format(**locals())
+                        + "{r['description']}".format(**locals()))
             for f in r['fields'].values():
                 offset, width = f['offset'], f['width']
-                mmap.append(f"0x{addr:08X} C   FIELD {offset:02d}w{width:02d} "
-                            + f"{f['name']}{f['access']}: "
-                            + f"{f['description']}")
+                mmap.append("0x{addr:08X} C   FIELD {offset:02d}w{width:02d} ".format(**locals())
+                            + "{f['name']}{f['access']}: ".format(**locals())
+                            + "{f['description']}".format(**locals()))
     return "\n".join(sorted(mmap))
 
 
