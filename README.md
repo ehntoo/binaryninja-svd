@@ -33,6 +33,7 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 Please make sure to update tests as appropriate.
 
 ## License
-This project is dual-licensed under the MIT and Apache 2.0 licenses.
+This project is dual-licensed under the MIT and Apache 2.0 licenses. You may
+use the project under the terms of the license that you prefer.
 [MIT](https://choosealicense.com/licenses/mit/)
 [Apache 2.0](https://choosealicense.com/licenses/apache-2.0/)
