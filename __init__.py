@@ -18,7 +18,10 @@ def load_svd(bv):
         else:
             s = Structure()
             for r in p['registers'].values():
-                s.insert(r['offset'], Type.int(int(r['size']/8), False), r['name'])
+                if r['size'] is None:
+                    s.insert(r['offset'], Type.int(4, False), r['name'])
+                else:
+                    s.insert(r['offset'], Type.int(int(r['size']/8), False), r['name'])
             struct_type = Type.structure_type(s)
             bv.define_user_type(p['name'], struct_type)
         bv.define_data_var(p['base'], struct_type)
