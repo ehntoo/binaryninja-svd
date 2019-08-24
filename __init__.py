@@ -13,7 +13,6 @@ def load_svd(bv):
 
         struct_type = None
         if 'derives' in p:
-            print("Hey, we hit it")
             struct_type = bv.get_type_by_name(device['peripherals'][p['derives']]['name'])
         else:
             s = Structure()
