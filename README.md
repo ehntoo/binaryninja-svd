@@ -12,6 +12,9 @@ Once your firmware is loaded into Binary Ninja, navigate to Tools and select
 `Load SVD`. Choose the SVD file to load from the file picker that shows up and
 you're all set.
 
+ARM maintains a large number of CMSIS-PACK files (which contain SVD maps) at 
+https://developer.arm.com/tools-and-software/embedded/cmsis/cmsis-packs
+
 For STM32 targets, the stm32-rs project is a great place to look for SVD files.
 https://stm32.agg.io/rs/ Since they do code generation to create hardware APIs,
 the project has a bunch of bugfixes from upstream. For other ARM parts,
