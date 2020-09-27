@@ -10,12 +10,12 @@ def load_svd(bv):
     derived_peripherals = [p for p in peripherals if 'derives' in p]
 
     def register_peripheral(p, struct_type):
-        bv.add_auto_section(p['name'], p['base'], p['size'],
+        bv.add_user_section(p['name'], p['base'], p['size'],
                             SectionSemantics.ReadWriteDataSectionSemantics)
-        bv.add_auto_segment(p['base'], p['size'], 0, 0,
+        bv.add_user_segment(p['base'], p['size'], 0, 0,
                             SegmentFlag.SegmentContainsData | SegmentFlag.SegmentReadable | SegmentFlag.SegmentWritable)
         bv.define_data_var(p['base'], struct_type)
-        bv.define_auto_symbol(Symbol(SymbolType.ImportedDataSymbol, p['base'], p['name']))
+        bv.define_user_symbol(Symbol(SymbolType.ImportedDataSymbol, p['base'], p['name']))
 
     for p in base_peripherals:
         s = Structure()
