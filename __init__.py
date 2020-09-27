@@ -1,9 +1,186 @@
-from binaryninja import *
-from binaryninja.types import Type, Symbol
+import os
+from zipfile import ZipFile
+from tempfile import TemporaryDirectory
+from PySide2.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
+    QHBoxLayout, QDialog, QFileSystemModel, QTreeView, QLabel, QSplitter,
+    QMessageBox, QHeaderView)
+from PySide2.QtCore import Qt, QFileInfo, QUrl
+
+from PySide2.QtGui import QDesktopServices, QKeySequence
+from PySide2.QtWebEngineWidgets import QWebEnginePage, QWebEngineView, QWebEngineProfile
+
+from binaryninja import user_plugin_path
+from binaryninja.log import log_error, log_debug, log_info
+from binaryninja.types import Type, Symbol, Structure
+from binaryninja.plugin import PluginCommand
+from binaryninja.enums import SegmentFlag, SectionSemantics, SymbolType
+from binaryninja.interaction import get_open_filename_input, show_message_box
 from .svdmmap import parse
 
-def load_svd(bv):
-    svd_file = interaction.get_open_filename_input("SVD File")
+
+svdPath = os.path.realpath(os.path.join(user_plugin_path(), "..", "svd"))
+try:
+    if not os.path.exists(svdPath):
+        os.mkdir(svdPath)
+except IOError:
+    log_error(f"Unable to create {svdPath}")
+
+class SVDBrowser(QDialog):
+    def __init__(self, context, parent=None):
+        super(SVDBrowser, self).__init__(parent)
+        QWebEngineProfile.defaultProfile().downloadRequested.connect(self.on_downloadRequested)
+
+        # Create widgets
+        #self.setWindowModality(Qt.ApplicationModal)
+        self.title = QLabel(self.tr("SVD Browser"))
+        self.closeButton = QPushButton(self.tr("Close"))
+        self.setWindowTitle(self.title.text())
+        self.browseButton = QPushButton("Browse SVD Folder")
+        self.deleteSvdButton = QPushButton("Delete")
+        self.applySvdButton = QPushButton("Apply SVD")
+        self.view = QWebEngineView()
+        url = "https://developer.arm.com/tools-and-software/embedded/cmsis/cmsis-search"
+        self.view.load(QUrl(url))
+        self.columns = 3
+        self.context = context
+
+        self.currentFileLabel = QLabel()
+        self.currentFile = ""
+
+        #Files
+        self.files = QFileSystemModel()
+        self.files.setRootPath(svdPath)
+        self.files.setNameFilters(["*.svd", "*.patched"])
+
+        #Tree
+        self.tree = QTreeView()
+        self.tree.setModel(self.files)
+        self.tree.setSortingEnabled(True)
+        self.tree.hideColumn(2)
+        self.tree.sortByColumn(0, Qt.AscendingOrder)
+        self.tree.setRootIndex(self.files.index(svdPath))
+        for x in range(self.columns):
+            #self.tree.resizeColumnToContents(x)
+            self.tree.header().setSectionResizeMode(x, QHeaderView.ResizeToContents)
+        treeLayout = QVBoxLayout()
+        treeLayout.addWidget(self.tree)
+        treeButtons = QHBoxLayout()
+        #treeButtons.addWidget(self.newFolderButton)
+        treeButtons.addWidget(self.browseButton)
+        treeButtons.addWidget(self.applySvdButton)
+        treeButtons.addWidget(self.deleteSvdButton)
+        treeLayout.addLayout(treeButtons)
+        treeWidget = QWidget()
+        treeWidget.setLayout(treeLayout)
+
+        # Create layout and add widgets
+        buttons = QHBoxLayout()
+        buttons.addWidget(self.closeButton)
+
+        vlayoutWidget = QWidget()
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.view)
+        vlayout.addLayout(buttons)
+        vlayoutWidget.setLayout(vlayout)
+
+        hsplitter = QSplitter()
+        hsplitter.addWidget(treeWidget)
+        hsplitter.addWidget(vlayoutWidget)
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(hsplitter)
+
+        self.showMaximized() #Fixes bug that maximized windows are "stuck"
+        #Because you can't trust QT to do the right thing here
+
+        # Set dialog layout
+        self.setLayout(hlayout)
+
+        # Add signals
+        self.closeButton.clicked.connect(self.close)
+        self.tree.selectionModel().selectionChanged.connect(self.selectFile)
+        self.applySvdButton.clicked.connect(self.applySvd)
+        self.deleteSvdButton.clicked.connect(self.deleteSvd)
+        self.browseButton.clicked.connect(self.browseSvd)
+
+    def browseSvd(self):
+        url = QUrl.fromLocalFile(svdPath)
+        QDesktopServices.openUrl(url)
+
+    def selectFile(self, new, old):
+        if len(new.indexes()) == 0:
+            self.tree.clearSelection()
+            self.currentFile = ""
+            return
+        newSelection = self.files.filePath(new.indexes()[0])
+        if QFileInfo(newSelection).isDir():
+            self.tree.clearSelection()
+            self.currentFile = ""
+            return
+        self.currentFile = newSelection
+
+    def applySvd(self):
+        selection = self.tree.selectedIndexes()[::self.columns][0] #treeview returns each selected element in the row
+        svdName = self.files.fileName(selection)
+        if (svdName != ""):
+            question = QMessageBox.question(self, self.tr("Confirm"), self.tr(f"Confirm applying {svdName} to {os.path.basename(self.context.file.filename)} : "))
+            if (question == QMessageBox.StandardButton.Yes):
+                log_debug("Applying SVD %s." % svdName)
+                load_svd(self.context, self.currentFile)
+                self.close()
+
+    def deleteSvd(self):
+        selection = self.tree.selectedIndexes()[::self.columns][0] #treeview returns each selected element in the row
+        svdName = self.files.fileName(selection)
+        question = QMessageBox.question(self, self.tr("Confirm"), self.tr("Confirm deletion: ") + svdName)
+        if (question == QMessageBox.StandardButton.Yes):
+            log_debug("Deleting SVD %s." % svdName)
+            self.files.remove(selection)
+            self.tree.clearSelection()
+
+    def on_downloadRequested(self, download):
+        old_path = download.url().path()  # download.path()
+        suffix = QFileInfo(old_path).suffix()
+        if (suffix.lower() in ["zip", "svd", "pack", "patched"]):
+            log_info(f"Downloading {str(download.url())}")
+            if suffix.lower() == "svd" or suffix.lower() == "patched":
+                download.setDownloadDirectory(svdPath)
+                download.accept()
+            else:
+                with TemporaryDirectory() as tempfolder:
+                    log_info(f"Downloading pack/zip to {tempfolder}")
+                    download.setDownloadDirectory(tempfolder)
+                    download.accept()
+                    show_message_box("Downloading", "Pack/ZIP being downloaded and extracted, will appear in the sidebar when finished.")
+                    while not download.finished:
+                        import time
+                        time.sleep(100)
+                    dest = os.path.join(svdPath, download.downloadFileName())
+                    if os.path.isfile(dest):
+                        folder_name = os.path.splitext(download.downloadFileName())[0]
+                        new_folder = os.path.join(svdPath, folder_name)
+                        os.mkdir(new_folder)
+                        with ZipFile(dest, 'r') as zipp:
+                            for fname in zipp.namelist():
+                                if 'SVD/' in fname:
+                                    info = zipp.getinfo(fname)
+                                    info.filename = os.path.basename(info.filename)
+                                    zipp.extract(new_folder, info)
+                    else:
+                        show_message_box("Download failed", "Download failed, please try to manually extract.")
+        else:
+            show_message_box("Invalid file", "That download does not appear to be a valid SVD/ZIP/PACK file.")
+            download.cancel()
+
+def launch_browser(bv):
+    svd = SVDBrowser(bv)
+    svd.exec_()
+
+def load_svd(bv, svd_file = None):
+    if not svd_file:
+        svd_file = get_open_filename_input("SVD File")
+    if isinstance(svd_file, str):
+        svd_file=bytes(svd_file, encoding="utf-8")
     device = parse(svd_file)
     peripherals = device['peripherals'].values()
     base_peripherals = [p for p in peripherals if 'derives' not in p]
@@ -34,7 +211,13 @@ def load_svd(bv):
 
 
 PluginCommand.register(
-    "Load SVD",
+    "SVD\\SVD Browser",
+    "Manage SVD files and browse/search for new files to load.",
+    launch_browser
+)
+
+PluginCommand.register(
+    "SVD\\Load SVD",
     "Apply an SVD's memory map",
     load_svd
 )
