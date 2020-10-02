@@ -1,4 +1,6 @@
 import os
+import requests
+import shutil
 from zipfile import ZipFile
 from tempfile import TemporaryDirectory
 from PySide2.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
@@ -23,7 +25,7 @@ try:
     if not os.path.exists(svdPath):
         os.mkdir(svdPath)
 except IOError:
-    log_error(f"Unable to create {svdPath}")
+    log_error(f"SVD Browser: Unable to create {svdPath}")
 
 class SVDBrowser(QDialog):
     def __init__(self, context, parent=None):
@@ -125,7 +127,7 @@ class SVDBrowser(QDialog):
         if (svdName != ""):
             question = QMessageBox.question(self, self.tr("Confirm"), self.tr(f"Confirm applying {svdName} to {os.path.basename(self.context.file.filename)} : "))
             if (question == QMessageBox.StandardButton.Yes):
-                log_debug("Applying SVD %s." % svdName)
+                log_debug("SVD Browser: Applying SVD %s." % svdName)
                 load_svd(self.context, self.currentFile)
                 self.close()
 
@@ -134,7 +136,7 @@ class SVDBrowser(QDialog):
         svdName = self.files.fileName(selection)
         question = QMessageBox.question(self, self.tr("Confirm"), self.tr("Confirm deletion: ") + svdName)
         if (question == QMessageBox.StandardButton.Yes):
-            log_debug("Deleting SVD %s." % svdName)
+            log_debug("SVD Browser: Deleting SVD %s." % svdName)
             self.files.remove(selection)
             self.tree.clearSelection()
 
@@ -142,35 +144,44 @@ class SVDBrowser(QDialog):
         old_path = download.url().path()  # download.path()
         suffix = QFileInfo(old_path).suffix()
         if (suffix.lower() in ["zip", "svd", "pack", "patched"]):
-            log_info(f"Downloading {str(download.url())}")
+            log_debug(f"SVD Browser: Downloading {str(download.url())}")
             if suffix.lower() == "svd" or suffix.lower() == "patched":
                 download.setDownloadDirectory(svdPath)
                 download.accept()
             else:
                 with TemporaryDirectory() as tempfolder:
-                    log_info(f"Downloading pack/zip to {tempfolder}")
+                    log_debug(f"SVD Browser: Downloading pack/zip to {tempfolder}")
+                    fname = download.url().fileName()
+                    r = requests.get(download.url().toString(), allow_redirects=True)
+                    dlfile = os.path.join(tempfolder, fname)
+                    open(dlfile, "wb").write(r.content)
+                    '''
+                    # TODO: See if the original QT Downloader can be fixed since it would
+                    # help with situations where the user entered credentials in the browser.
                     download.setDownloadDirectory(tempfolder)
                     download.accept()
-                    show_message_box("Downloading", "Pack/ZIP being downloaded and extracted, will appear in the sidebar when finished.")
                     while not download.finished:
                         import time
                         time.sleep(100)
-                    dest = os.path.join(svdPath, download.downloadFileName())
-                    if os.path.isfile(dest):
-                        folder_name = os.path.splitext(download.downloadFileName())[0]
-                        new_folder = os.path.join(svdPath, folder_name)
-                        os.mkdir(new_folder)
-                        with ZipFile(dest, 'r') as zipp:
-                            for fname in zipp.namelist():
-                                if 'SVD/' in fname:
-                                    info = zipp.getinfo(fname)
+                    '''
+                    if fname.endswith(".zip") or fname.endswith(".pack"):
+                        destFolder = os.path.join(svdPath, os.path.splitext(fname)[0])
+                        log_debug(f"SVD Browser: Creating {destFolder}")
+                        if not os.path.exists(destFolder):
+                            os.mkdir(destFolder)
+                        with ZipFile(dlfile, 'r') as zipp:
+                            for ifname in zipp.namelist():
+                                if ifname.endswith(".svd"):
+                                    info = zipp.getinfo(ifname)
                                     info.filename = os.path.basename(info.filename)
-                                    zipp.extract(new_folder, info)
+                                    log_debug(f"SVD Browser: Extracting {info.filename} from {ifname}")
+                                    zipp.extract(info, path=destFolder)
                     else:
-                        show_message_box("Download failed", "Download failed, please try to manually extract.")
+                        #Move file into place
+                        shutil.move(dlfile, svdPath)
         else:
             show_message_box("Invalid file", "That download does not appear to be a valid SVD/ZIP/PACK file.")
-            download.cancel()
+        download.cancel()
 
 def launch_browser(bv):
     svd = SVDBrowser(bv)
@@ -181,6 +192,10 @@ def load_svd(bv, svd_file = None):
         svd_file = get_open_filename_input("SVD File")
     if isinstance(svd_file, str):
         svd_file=bytes(svd_file, encoding="utf-8")
+    if not os.access(svd_file, os.R_OK):
+        log_error(f"SVD Browser: Unable to open {svd_file}")
+        return
+    log_info(f"SVD Loader: Loading {svd_file}")
     device = parse(svd_file)
     peripherals = device['peripherals'].values()
     base_peripherals = [p for p in peripherals if 'derives' not in p]
