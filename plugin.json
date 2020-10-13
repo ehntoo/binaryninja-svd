@@ -12,13 +12,13 @@
     },
     "platforms": ["Windows", "Linux", "Darwin"],
     "installinstructions" : {
-            "Windows":"",
-            "Linux":"",
-            "Darwin":""
+            "Windows":"Install the 'requests' pip package.",
+            "Linux":"Install the 'requests' pip package.",
+            "Darwin":"Install the 'requests' pip package."
     },
     "dependencies": {
     },
-    "version": "1.0.1",
+    "version": "2.0.0",
     "author": "Mitchell Johnson (@ehntoo)",
     "minimumbinaryninjaversion": 0
 }
