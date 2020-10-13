@@ -4,7 +4,7 @@ This library will parse out structure definitions for the memory-mapped peripher
 
 ## Installation
 
-Use the Binary Ninja plugin manager to install the plugin.
+Use the Binary Ninja plugin manager to install the plugin, and install the "requests" pip package in your python install.
 
 ## Usage
 
