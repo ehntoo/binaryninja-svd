@@ -211,11 +211,24 @@ def load_svd(bv, svd_file = None):
 
     for p in base_peripherals:
         s = Structure()
+
+        # Track the size of the peripheral
+        periph_size = 0
         for r in p['registers'].values():
             if r['size'] is None:
-                s.insert(r['offset'], Type.int(4, False), r['name'])
+                reg_size = 4
             else:
-                s.insert(r['offset'], Type.int(int(r['size']/8), False), r['name'])
+                reg_size = r['size'] // 8
+
+            s.insert(r['offset'], Type.int(reg_size, False), r['name'])
+
+            if r['offset'] >= periph_size:
+                periph_size = r['offset'] + reg_size
+
+        # Update the peripheral size if it is incorrect
+        if p['size'] < periph_size:
+            p['size'] = periph_size
+
         struct_type = Type.structure_type(s)
         bv.define_user_type(p['name'], struct_type)
         register_peripheral(p, struct_type)
