@@ -13,7 +13,14 @@ from PySide2.QtWebEngineWidgets import QWebEnginePage, QWebEngineView, QWebEngin
 
 from binaryninja import user_plugin_path
 from binaryninja.log import log_error, log_debug, log_info
-from binaryninja.types import Type, Symbol, Structure
+
+try:
+    from binaryninja.types import Type, Symbol, StructureBuilder, StructureVariant
+    post3 = True
+except ImportError:
+    from binaryninja.types import Type, Symbol, Structure, StructureType
+    post3 = False
+
 from binaryninja.plugin import PluginCommand
 from binaryninja.enums import SegmentFlag, SectionSemantics, SymbolType
 from binaryninja.interaction import get_open_filename_input, show_message_box
@@ -210,7 +217,11 @@ def load_svd(bv, svd_file = None):
         bv.define_user_symbol(Symbol(SymbolType.ImportedDataSymbol, p['base'], p['name']))
 
     for p in base_peripherals:
-        s = Structure()
+        if post3:
+            s = StructureBuilder.create(type=StructureVariant.StructStructureType)
+        else:
+            s = Structure()
+            s.type = StructureType.StructStructureType
         for r in p['registers'].values():
             if r['size'] is None:
                 s.insert(r['offset'], Type.int(4, False), r['name'])
