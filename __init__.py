@@ -166,10 +166,9 @@ def load_svd(bv, svd_file = None):
 
     for p in base_peripherals:
         if post3:
-                s= StructureBuilder.create(type=StructureVariant.StructStructureType)
+            s= StructureBuilder.create(type=StructureVariant.StructStructureType)
         else:
             s = Structure()
-            s.type = StructureType.StructStrutureType
 
         # Track the size of the peripheral
         periph_size = 0
