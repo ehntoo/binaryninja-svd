@@ -2,7 +2,7 @@
     "pluginmetadataversion": 2,
 		"name": "SVD Memory Map Parser",
     "type": ["helper" ],
-    "api": ["python2", "python3"],
+    "api": ["python3"],
     "description": "A parser for the CMSIS System View Description format",
 		"longdescription": "This plugin augments a binary view with new types and memory regions representing the peripherals of an ARM CMSIS-SVD file.",
     "license": {
@@ -11,14 +11,9 @@
 
     },
     "platforms": ["Windows", "Linux", "Darwin"],
-    "installinstructions" : {
-            "Windows":"Install the 'requests' pip package.",
-            "Linux":"Install the 'requests' pip package.",
-            "Darwin":"Install the 'requests' pip package."
-    },
     "dependencies": {
     },
-    "version": "2.0.0",
+    "version": "3.0.0",
     "author": "Mitchell Johnson (@ehntoo)",
     "minimumbinaryninjaversion": 0
 }
