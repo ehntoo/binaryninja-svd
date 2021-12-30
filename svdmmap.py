@@ -123,14 +123,14 @@ def expand_cluster(node):
     offsets updated to include the cluster address offset.
     The returned register nodes are as though they were never in a cluster.
     """
-    if node.attrib.get('dim_index') is None:
-        raise ValueError("Can't process cluster without dim_index")
-    cluster_idx = node.attrib['dim_index']
+    cluster_name = get_string(node, 'name')
+    if node.attrib.get('dim_index') is not None:
+        cluster_name = cluster_name.replace('[%s]', node.attrib['dim_index'])
     cluster_addr = get_int(node, 'addressOffset')
     nodes = []
     for rtag in node.findall('register'):
         addr = cluster_addr + get_int(rtag, 'addressOffset')
-        name = get_string(rtag, 'name') + str(cluster_idx)
+        name = str(cluster_name) + get_string(rtag, 'name')
         new_rtag = copy.deepcopy(rtag)
         new_rtag.find('addressOffset').text = "0x{addr:08x}".format(**locals())
         new_rtag.find('name').text = name
