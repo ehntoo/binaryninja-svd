@@ -3,12 +3,21 @@ import requests
 import shutil
 from zipfile import ZipFile
 from tempfile import TemporaryDirectory
-from PySide6.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
-    QHBoxLayout, QDialog, QFileSystemModel, QTreeView, QLabel, QSplitter,
-    QMessageBox, QHeaderView)
-from PySide6.QtCore import Qt, QFileInfo, QUrl
 
-from PySide6.QtGui import QDesktopServices, QKeySequence
+try:
+    from PySide6.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
+        QHBoxLayout, QDialog, QFileSystemModel, QTreeView, QLabel, QSplitter,
+        QMessageBox, QHeaderView)
+    from PySide6.QtCore import Qt, QFileInfo, QUrl
+
+    from PySide6.QtGui import QDesktopServices, QKeySequence
+except ImportError:
+    from PySide2.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
+        QHBoxLayout, QDialog, QFileSystemModel, QTreeView, QLabel, QSplitter,
+        QMessageBox, QHeaderView)
+    from PySide2.QtCore import Qt, QFileInfo, QUrl
+
+    from PySide2.QtGui import QDesktopServices, QKeySequence
 
 from binaryninja import user_plugin_path
 from binaryninja.log import log_error, log_debug, log_info
