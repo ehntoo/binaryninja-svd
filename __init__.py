@@ -1,8 +1,4 @@
 import os
-import requests
-import shutil
-from zipfile import ZipFile
-from tempfile import TemporaryDirectory
 
 try:
     from PySide6.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
