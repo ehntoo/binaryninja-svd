@@ -3,17 +3,31 @@ import requests
 import shutil
 from zipfile import ZipFile
 from tempfile import TemporaryDirectory
-from PySide2.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
-    QHBoxLayout, QDialog, QFileSystemModel, QTreeView, QLabel, QSplitter,
-    QMessageBox, QHeaderView)
-from PySide2.QtCore import Qt, QFileInfo, QUrl
 
-from PySide2.QtGui import QDesktopServices, QKeySequence
-from PySide2.QtWebEngineWidgets import QWebEnginePage, QWebEngineView, QWebEngineProfile
+try:
+    from PySide6.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
+        QHBoxLayout, QDialog, QFileSystemModel, QTreeView, QLabel, QSplitter,
+        QMessageBox, QHeaderView)
+    from PySide6.QtCore import Qt, QFileInfo, QUrl
+
+    from PySide6.QtGui import QDesktopServices, QKeySequence
+except ImportError:
+    from PySide2.QtWidgets import (QPushButton, QWidget, QVBoxLayout,
+        QHBoxLayout, QDialog, QFileSystemModel, QTreeView, QLabel, QSplitter,
+        QMessageBox, QHeaderView)
+    from PySide2.QtCore import Qt, QFileInfo, QUrl
+
+    from PySide2.QtGui import QDesktopServices, QKeySequence
 
 from binaryninja import user_plugin_path
 from binaryninja.log import log_error, log_debug, log_info
-from binaryninja.types import Type, Symbol, Structure
+try:
+    from binaryninja.types import Type, Symbol, StructureBuilder, StructureVariant
+    post3 = True
+except ImportError:
+    from binaryninja.types import Type, Symbol, Structure, StructureType
+    post3 = False
+
 from binaryninja.plugin import PluginCommand
 from binaryninja.enums import SegmentFlag, SectionSemantics, SymbolType
 from binaryninja.interaction import get_open_filename_input, show_message_box
@@ -30,7 +44,6 @@ except IOError:
 class SVDBrowser(QDialog):
     def __init__(self, context, parent=None):
         super(SVDBrowser, self).__init__(parent)
-        QWebEngineProfile.defaultProfile().downloadRequested.connect(self.on_downloadRequested)
 
         # Create widgets
         #self.setWindowModality(Qt.ApplicationModal)
@@ -38,11 +51,10 @@ class SVDBrowser(QDialog):
         self.closeButton = QPushButton(self.tr("Close"))
         self.setWindowTitle(self.title.text())
         self.browseButton = QPushButton("Browse SVD Folder")
+        self.onlineButton = QPushButton("Search Online")
         self.deleteSvdButton = QPushButton("Delete")
         self.applySvdButton = QPushButton("Apply SVD")
-        self.view = QWebEngineView()
-        url = "https://developer.arm.com/tools-and-software/embedded/cmsis/cmsis-search"
-        self.view.load(QUrl(url))
+        self.url = "https://developer.arm.com/tools-and-software/embedded/cmsis/cmsis-search"
         self.columns = 3
         self.context = context
 
@@ -70,40 +82,25 @@ class SVDBrowser(QDialog):
         #treeButtons.addWidget(self.newFolderButton)
         treeButtons.addWidget(self.browseButton)
         treeButtons.addWidget(self.applySvdButton)
-        treeButtons.addWidget(self.deleteSvdButton)
+        treeButtons.addWidget(self.onlineButton)
+        treeButtons.addWidget(self.closeButton)
         treeLayout.addLayout(treeButtons)
         treeWidget = QWidget()
         treeWidget.setLayout(treeLayout)
 
-        # Create layout and add widgets
-        buttons = QHBoxLayout()
-        buttons.addWidget(self.closeButton)
-
-        vlayoutWidget = QWidget()
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(self.view)
-        vlayout.addLayout(buttons)
-        vlayoutWidget.setLayout(vlayout)
-
-        hsplitter = QSplitter()
-        hsplitter.addWidget(treeWidget)
-        hsplitter.addWidget(vlayoutWidget)
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(hsplitter)
-
-        self.showMaximized() #Fixes bug that maximized windows are "stuck"
-        #Because you can't trust QT to do the right thing here
-
         # Set dialog layout
-        self.setLayout(hlayout)
+        self.setLayout(treeLayout)
 
         # Add signals
         self.closeButton.clicked.connect(self.close)
         self.tree.selectionModel().selectionChanged.connect(self.selectFile)
         self.applySvdButton.clicked.connect(self.applySvd)
-        self.deleteSvdButton.clicked.connect(self.deleteSvd)
+        #self.deleteSvdButton.clicked.connect(self.deleteSvd)
         self.browseButton.clicked.connect(self.browseSvd)
+        self.onlineButton.clicked.connect(self.searchOnline)
+
+    def searchOnline(self):
+        QDesktopServices.openUrl(self.url)
 
     def browseSvd(self):
         url = QUrl.fromLocalFile(svdPath)
@@ -132,6 +129,7 @@ class SVDBrowser(QDialog):
                 self.close()
 
     def deleteSvd(self):
+        '''Removed in favor of the browse functionality'''
         selection = self.tree.selectedIndexes()[::self.columns][0] #treeview returns each selected element in the row
         svdName = self.files.fileName(selection)
         question = QMessageBox.question(self, self.tr("Confirm"), self.tr("Confirm deletion: ") + svdName)
@@ -139,49 +137,6 @@ class SVDBrowser(QDialog):
             log_debug("SVD Browser: Deleting SVD %s." % svdName)
             self.files.remove(selection)
             self.tree.clearSelection()
-
-    def on_downloadRequested(self, download):
-        old_path = download.url().path()  # download.path()
-        suffix = QFileInfo(old_path).suffix()
-        if (suffix.lower() in ["zip", "svd", "pack", "patched"]):
-            log_debug(f"SVD Browser: Downloading {str(download.url())}")
-            if suffix.lower() == "svd" or suffix.lower() == "patched":
-                download.setDownloadDirectory(svdPath)
-                download.accept()
-            else:
-                with TemporaryDirectory() as tempfolder:
-                    log_debug(f"SVD Browser: Downloading pack/zip to {tempfolder}")
-                    fname = download.url().fileName()
-                    r = requests.get(download.url().toString(), allow_redirects=True)
-                    dlfile = os.path.join(tempfolder, fname)
-                    open(dlfile, "wb").write(r.content)
-                    '''
-                    # TODO: See if the original QT Downloader can be fixed since it would
-                    # help with situations where the user entered credentials in the browser.
-                    download.setDownloadDirectory(tempfolder)
-                    download.accept()
-                    while not download.finished:
-                        import time
-                        time.sleep(100)
-                    '''
-                    if fname.endswith(".zip") or fname.endswith(".pack"):
-                        destFolder = os.path.join(svdPath, os.path.splitext(fname)[0])
-                        log_debug(f"SVD Browser: Creating {destFolder}")
-                        if not os.path.exists(destFolder):
-                            os.mkdir(destFolder)
-                        with ZipFile(dlfile, 'r') as zipp:
-                            for ifname in zipp.namelist():
-                                if ifname.endswith(".svd"):
-                                    info = zipp.getinfo(ifname)
-                                    info.filename = os.path.basename(info.filename)
-                                    log_debug(f"SVD Browser: Extracting {info.filename} from {ifname}")
-                                    zipp.extract(info, path=destFolder)
-                    else:
-                        #Move file into place
-                        shutil.move(dlfile, svdPath)
-        else:
-            show_message_box("Invalid file", "That download does not appear to be a valid SVD/ZIP/PACK file.")
-        download.cancel()
 
 def launch_browser(bv):
     svd = SVDBrowser(bv)
@@ -210,7 +165,11 @@ def load_svd(bv, svd_file = None):
         bv.define_user_symbol(Symbol(SymbolType.ImportedDataSymbol, p['base'], p['name']))
 
     for p in base_peripherals:
-        s = Structure()
+        if post3:
+                s= StructureBuilder.create(type=StructureVariant.StructStructureType)
+        else:
+            s = Structure()
+            s.type = StructureType.StructStrutureType
 
         # Track the size of the peripheral
         periph_size = 0
