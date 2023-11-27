@@ -12,9 +12,11 @@ https://github.com/stm32-rs/stm32-rs/blob/master/scripts/svdmmap.py
 import sys
 import copy
 import xml.etree.ElementTree as ET
+from xml.etree.ElementTree import Element
 
+from typing import List
 
-def iter_clusters(ptag):
+def iter_clusters(ptag: Element) -> List[Element]:
     registers = ptag.find('registers')
     if registers is None:
         return []
@@ -22,7 +24,7 @@ def iter_clusters(ptag):
         return registers.findall('cluster')
 
 
-def iter_registers(ptag):
+def iter_registers(ptag: Element) -> List[Element]:
     registers = ptag.find('registers')
     if registers is None:
         return []
@@ -30,7 +32,7 @@ def iter_registers(ptag):
         return registers.findall('register')
 
 
-def iter_fields(rtag):
+def iter_fields(rtag: Element) -> List[Element]:
     fields = rtag.find('fields')
     if fields is None:
         return []
@@ -82,7 +84,7 @@ def get_int(node, tag, default=None):
         return int(text, 10)
 
 
-def expand_dim(node):
+def expand_dim(node: Element):
     """
     Given a node (a cluster or a register) which may have a `dim` child,
     returns an expanded list of all such nodes with '%s' in the name replaced
@@ -104,7 +106,7 @@ def expand_dim(node):
             idxs = list(range(int(li), int(ri)+1))
         else:
             raise ValueError("Unknown dimIndex: '{idxs}'".format(**locals()))
-    nodes = []
+    nodes: List[Element] = []
     for cnt, idx in enumerate(idxs):
         name = get_string(node, 'name').replace("%s", str(idx))
         dim_node = copy.deepcopy(node)
