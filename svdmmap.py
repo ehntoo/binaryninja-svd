@@ -97,13 +97,13 @@ def expand_dim(node: Element):
     inc = get_int(node, 'dimIncrement')
     idxs = get_string(node, 'dimIndex')
     if idxs is None:
-        idxs = list(range(dim))
+        idxs = range(int(dim))
     else:
         if "," in idxs:
             idxs = idxs.split(",")
         elif "-" in idxs:
             li, ri = idxs.split("-")
-            idxs = list(range(int(li), int(ri)+1))
+            idxs = range(int(li), int(ri) + 1)
         else:
             raise ValueError("Unknown dimIndex: '{idxs}'".format(**locals()))
     nodes: List[Element] = []
